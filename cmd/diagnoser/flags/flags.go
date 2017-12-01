@@ -27,7 +27,7 @@ const (
 
 // Options captures the command line flags passed
 type Options struct {
-	RunInfo        bool
+	Mode           string
 	KubeConfigFile string
 	KubeMasterURL  string
 	SleepTime      int
@@ -37,7 +37,7 @@ type Options struct {
 // Parse analyzes the given flags and return them inside an Options struct
 func Parse() *Options {
 	var (
-		runInfo        = flag.Bool("run-info", true, "run info checks?")
+		mode           = flag.String("mode", "troubleshooter", "Whether to run diagnoser in troubleshooter mode or monitor mode")
 		kubeConfigFile = flag.String("kubecfg-file", "", "Location of kubecfg file for access to kubernetes master service")
 		kubeMasterURL  = flag.String("kube-master-url", "", "URL to reach master")
 		sleepTime      = flag.Int("sleep-time", DefaultSleepTime, "Time to wait after finishing the tasks and exiting")
@@ -46,7 +46,7 @@ func Parse() *Options {
 	flag.Parse()
 
 	return &Options{
-		RunInfo:        *runInfo,
+		Mode:           *mode,
 		KubeConfigFile: *kubeConfigFile,
 		KubeMasterURL:  *kubeMasterURL,
 		SleepTime:      *sleepTime,

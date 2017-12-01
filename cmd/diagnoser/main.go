@@ -45,23 +45,15 @@ func main() {
 		glog.Fatal(err)
 	}
 
-	if err := run(options, cs); err != nil {
-		glog.Fatal(err)
+	switch options.Mode {
+	case "troubleshooter":
+		err := RunTroubleshooter(opt, cs)
+	case "monitor":
+		err := RunMonitor(opt, cs)
 	}
+
 	time.Sleep(time.Duration(options.SleepTime) * time.Second)
 	os.Exit(options.ExitCode)
-}
-
-func run(opt *flags.Options, cs v1.CoreV1Interface) error {
-	ts := task.Bundle()
-
-	for _, t := range ts {
-		if err := t.Run(opt, cs); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func newClientset(opt *flags.Options) (v1.CoreV1Interface, error) {

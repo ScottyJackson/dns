@@ -17,7 +17,6 @@ limitations under the License.
 package task
 
 import (
-	"bufio"
 	"fmt"
 	"strconv"
 	"strings"
@@ -29,18 +28,8 @@ import (
 	"k8s.io/dns/cmd/diagnoser/flags"
 )
 
-type info struct{}
-
-func init() {
-	register(&info{})
-}
-
-func (i *info) Run(opt *flags.Options, cs v1.CoreV1Interface) error {
-	if !opt.RunInfo {
-		return nil
-	}
-
-	// Step 1: check that dns-pods are up
+func RunTroubleshooter(opt *flags.Options, cs v1.CoreV1Interface) error {
+	// Step 1: check that dns-pods are up / get number of restarts
 	glog.Info("Checking that kube-dns pods are up...")
 	dnsPods, err := cs.Pods("kube-system").List(meta_v1.ListOptions{
 		LabelSelector: `k8s-app=kube-dns`})
@@ -57,55 +46,7 @@ func (i *info) Run(opt *flags.Options, cs v1.CoreV1Interface) error {
 
 	// Step 2: search through logs for log level > I
 	glog.Info("Parsing kube-dns logs for suspicious logs...")
-	lvlmap := map[string]string{
-		"W": "Warning",
-		"E": "Error",
-		"F": "Fail",
-	}
-	timestamps := make(map[string]time.Time)
-
-	for _, pod := range dnsPods.Items {
-		podName := pod.ObjectMeta.Name
-		for _, containerName := range []string{"kubedns", "sidecar", "dnsmasq"} {
-			req := cs.RESTClient().Get().
-				Namespace("kube-system").
-				Name(podName).
-				Resource("pods").
-				SubResource("log").
-				Param("container", containerName).
-				Param("timestamps", "true")
-
-			var timestamp time.Time
-			key := podName + ":" + containerName
-			if timestamp, ok := timestamps[key]; ok {
-				req.Param("sinceTime", timestamp.Format(time.RFC3339))
-			}
-
-			readCloser, err := req.Stream()
-			if err != nil {
-				return err
-			}
-
-			scanner := bufio.NewScanner(readCloser)
-			for scanner.Scan() {
-				line := scanner.Text()
-				splitLine := strings.Fields(line)
-				timestamp, _ = time.Parse(time.RFC3339, splitLine[0])
-				switch lvl := string(splitLine[1][0]); lvl {
-				case "E", "W", "F":
-					glog.Warningf("%s detected : pod %s : container %s : %s",
-						lvlmap[lvl], podName, containerName, line)
-				}
-			}
-
-			if err := scanner.Err(); err != nil {
-				glog.Errorf("error: %s", err)
-			}
-
-			readCloser.Close()
-			timestamps[key] = timestamp
-		}
-	}
+	CheckDnsLogs(cs, dnsPods, make(map[string]time.Time))
 
 	// Step 3: Verify that the dns-service is up
 	glog.Info("Checking kube-dns Service...")

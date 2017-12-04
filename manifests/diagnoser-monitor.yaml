@@ -1,0 +1,17 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: diagnoser
+spec:
+  template:
+    metadata:
+      name: diagnoser
+    spec:
+      containers: 
+      - name: diagnoser
+        image: gcr.io/dns-diagnoser/k8s-dns-diagnoser-amd64:latest
+        args: ["-mode=monitor"]
+      - name: kubectl
+        image: "gcr.io/google_containers/kubectl:v0.18.0-120-gaeb4ac55ad12b1-dirty"
+        args: ["proxy", "-p", "8001"]
+      restartPolicy: Never

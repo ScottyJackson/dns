@@ -1,41 +1,24 @@
-/*
-Copyright 2017 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package task
 
 import (
 	"bufio"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/typed/core/v1"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 )
 
-const lvlmap map[string]string = map[string]string{
+var lvlmap = map[string]string{
 	"W": "Warning",
 	"E": "Error",
 	"F": "Fail",
 }
 
-func CheckDnsLogs(cs v1.CoreV1Interface, pods *meta_v1.PodList, tsMap map[string]time.Time) {
+func CheckDnsLogs(cs v1.CoreV1Interface, pods *apiv1.PodList, tsMap map[string]string) error {
 	for _, pod := range pods.Items {
 		podName := pod.ObjectMeta.Name
-		for _, containerName := range []string{"kubedns", "sidecar", "dnsmasq"} {
+		for _, containerName := range []string{"kubedns", "dnsmasq"} {
 			req := cs.RESTClient().Get().
 				Namespace("kube-system").
 				Name(podName).
@@ -44,10 +27,10 @@ func CheckDnsLogs(cs v1.CoreV1Interface, pods *meta_v1.PodList, tsMap map[string
 				Param("container", containerName).
 				Param("timestamps", "true")
 
-			var timestamp time.Time
+			var timestamp string
 			key := podName + ":" + containerName
 			if timestamp, ok := tsMap[key]; ok {
-				req.Param("sinceTime", timestamp.Format(time.RFC3339))
+				req.Param("sinceTime", timestamp)
 			}
 
 			readCloser, err := req.Stream()
@@ -59,7 +42,7 @@ func CheckDnsLogs(cs v1.CoreV1Interface, pods *meta_v1.PodList, tsMap map[string
 			for scanner.Scan() {
 				line := scanner.Text()
 				splitLine := strings.Fields(line)
-				timestamp, _ = time.Parse(time.RFC3339, splitLine[0])
+				timestamp = splitLine[0]
 				switch lvl := string(splitLine[1][0]); lvl {
 				case "E", "W", "F":
 					glog.Warningf("%s detected : pod %s : container %s : %s",
@@ -75,4 +58,6 @@ func CheckDnsLogs(cs v1.CoreV1Interface, pods *meta_v1.PodList, tsMap map[string
 			tsMap[key] = timestamp
 		}
 	}
+
+	return nil
 }

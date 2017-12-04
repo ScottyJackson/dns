@@ -47,9 +47,17 @@ func main() {
 
 	switch options.Mode {
 	case "troubleshooter":
-		err := RunTroubleshooter(opt, cs)
+		glog.Info("Running Troubleshooter")
+		err := task.RunTroubleshooter(options, cs)
+		if err != nil {
+			glog.Fatal(err)
+		}
 	case "monitor":
-		err := RunMonitor(opt, cs)
+		glog.Info("Running Monitor")
+		err := task.RunMonitor(cs)
+		if err != nil {
+			glog.Fatal(err)
+		}
 	}
 
 	time.Sleep(time.Duration(options.SleepTime) * time.Second)

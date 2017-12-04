@@ -10,5 +10,4 @@ spec:
       containers:
       - name: diagnoser
         image: gcr.io/dns-diagnoser/k8s-dns-diagnoser-amd64:latest
-        args: ["$(DIAGNOSER_ARGS)"]
       restartPolicy: Never

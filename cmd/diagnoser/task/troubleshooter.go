@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +45,7 @@ func RunTroubleshooter(opt *flags.Options, cs v1.CoreV1Interface) error {
 
 	// Step 2: search through logs for log level > I
 	glog.Info("Parsing kube-dns logs for suspicious logs...")
-	CheckDnsLogs(cs, dnsPods, make(map[string]time.Time))
+	CheckDnsLogs(cs, dnsPods, make(map[string]string))
 
 	// Step 3: Verify that the dns-service is up
 	glog.Info("Checking kube-dns Service...")

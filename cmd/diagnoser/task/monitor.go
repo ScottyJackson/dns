@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"time"
 
@@ -37,12 +38,14 @@ func RunMonitor(cs v1.CoreV1Interface) error {
 	baseHeapsterURI := "http://localhost:8001/api/v1/proxy/namespaces/kube-system/services/heapster/api/v1/model/namespaces/kube-system"
 	// slice of wanted pod level metrics
 	podMetrics := []string{
-		"network/rx_rate"
+		"network/rx_rate",
 		"network/rx_errors",
 		"network/tx_rate",
 		"network/tx_errors",
 		"cpu/usage_rate",
 		"memory/usage"}
+
+	time.Sleep(10 * time.Second)
 
 	for totalRunTime := 0 * time.Second; totalRunTime < 3*time.Hour; {
 
@@ -69,23 +72,59 @@ func RunMonitor(cs v1.CoreV1Interface) error {
 
 				for _, record := range metricResp["metrics"].([]interface{}) {
 					record, _ := record.(map[string]interface{})
-					tsMap[key] = record["latestTimestamp"]
 					glog.Infof("[%v] %s: %v", record["timestamp"], metric, record["value"])
 				}
+
+				tsMap[key] = metricResp["latestTimestamp"].(string)
 			}
 
 			glog.Infof("Container Restart Counts")
 			for _, container := range pod.Status.ContainerStatuses {
 				glog.Infof("%s: %d", container.Name, container.RestartCount)
 			}
-
-			glog.Infof("Checking Container Logs")
-			err = CheckDnsLogs(cs, dnsPods, tsMap)
 		}
+
+		glog.Infof("Checking Container Logs")
+		err = CheckDnsLogs(cs, dnsPods, tsMap)
 
 		services, err := cs.Services("").List(meta_v1.ListOptions{})
 		if err != nil {
 			return err
+		}
+
+		for _, service := range services.Items {
+			ns := service.ObjectMeta.Namespace
+
+			srvcName := service.ObjectMeta.Name
+			if len(ns) > 0 {
+				srvcName += fmt.Sprintf(".%s", ns)
+			}
+
+			glog.Infof("DNS Lookups for %s", srvcName)
+
+			start := time.Now()
+			cname, err := net.LookupCNAME(srvcName)
+			elapsed := time.Since(start)
+			if err != nil {
+				glog.Errorf("%s -- took %v", err, elapsed)
+			}
+			glog.Infof("CNAME: %s -- took %v", cname, elapsed)
+
+			start = time.Now()
+			addrs, err := net.LookupHost(srvcName)
+			elapsed = time.Since(start)
+			if err != nil {
+				glog.Errorf("%s -- took %v", err, elapsed)
+			}
+			glog.Infof("ADDRS: %+v -- took %v", addrs, elapsed)
+
+			start = time.Now()
+			ips, err := net.LookupIP(srvcName)
+			elapsed = time.Since(start)
+			if err != nil {
+				glog.Errorf("%s -- took %v", err, elapsed)
+			}
+			glog.Infof("IPS: %+v -- took %v", ips, elapsed)
 		}
 
 		time.Sleep(10 * time.Second)

@@ -3,6 +3,7 @@ package task
 import (
 	"bufio"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/client-go/kubernetes/typed/core/v1"
@@ -55,7 +56,7 @@ func CheckDnsLogs(cs v1.CoreV1Interface, pods *apiv1.PodList, tsMap map[string]s
 			}
 
 			readCloser.Close()
-			tsMap[key] = timestamp
+			tsMap[key] = (time.Parse(time.RFC3339, timestamp) + time.Second*1).Format(time.RFC3339)
 		}
 	}
 
